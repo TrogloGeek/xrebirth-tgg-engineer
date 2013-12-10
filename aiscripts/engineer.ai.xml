@@ -273,7 +273,7 @@
           <do_if value="$torepair.exists and ($torepair.hullpercentage lt $tohullvalue)">
             <set_object_hull object="$torepair" exact="$tohullvalue"/>
             <!--debug_text filter="error" text="'%1,%2: %3 repaired up to %4%% hull, took %5s'.[this.name, this.defensible.name, $torepair.name, $tohullvalue, $timetorepair]"/-->
-            <do_if value="this.skill.engineering" max="4">
+            <do_if value="this.defensible.isplayerowned and (this.skill.engineering lt 5)">
               <set_experience_progress entity="this" exact="this.experienceprogress + 1"/>
             </do_if>
           </do_if>
@@ -316,7 +316,7 @@
             <do_if value="$torepair.iswreck">
               <restore_object object="$torepair" hull="1"/>
               <!--debug_text filter="error" text="'%1,%2: %3 restored from wreckstate'.[this.name, this.defensible.name, $torepair.name]"/-->
-              <do_if value="this.skill.engineering" max="4">
+              <do_if value="this.defensible.isplayerowned and (this.skill.engineering lt 5)">
                 <set_experience_progress entity="this" exact="this.experienceprogress + 5"/>
               </do_if>
             </do_if>
@@ -364,7 +364,7 @@
             <!-- ]=> no_summary_repairable-->
             <resume label="no_summary_repairable"/>
           </do_else>
-          <do_if value="this.skill.engineering" max="4">
+          <do_if value="this.defensible.isplayerowned and (this.skill.engineering lt 5)">
             <set_experience_progress entity="this" exact="this.experienceprogress + 1"/>
           </do_if>
           <!--]=> do_repair-->

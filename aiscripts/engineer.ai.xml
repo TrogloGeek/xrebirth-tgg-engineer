@@ -1,0 +1,380 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<diff>  
+  <replace sel="/aiscript[@name='engineer.ai']">
+    <aiscript name="engineer.ai" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="12">
+      <params>
+        <param name="debugoutputchance" default="0"/>
+      </params>
+      <init>
+        <set_command command="command.repair" />
+      </init>
+      <attention min="unknown">
+        <actions>
+          <!--###REMOVED######
+          Previous blocking actions set to chance="0"
+          #######REMOVED######-->
+          <wait exact="0s" chance="0"/>
+          <wait exact="0s" chance="0"/>
+          <wait exact="0s" chance="0"/>
+          <wait exact="0s" sinceversion="2"/>
+          <wait exact="0s" sinceversion="2"/>
+          <wait min="30s" max="90s" sinceversion="12"/>
+      
+          <do_if value="@$networkid">
+            <!--debug_text filter="error" text="'%1,%2: is ending mass traffic'.[this.name, this.defensible.name]" /-->
+            <end_mass_traffic network="$networkid" />
+            <remove_value name="$networkid"/>
+          </do_if>
+      
+          <!--[init]-->
+          <label name="init"/>
+          <set_value name="$version" exact="12"/>
+          <do_if value="this.defensible.isclass.station">
+            <set_value name="$hulldamagelimit" exact="100" comment="below what percentage hull is a component considered damaged"/>
+          </do_if>
+          <do_else>
+            <set_value name="$hulldamagelimit" exact="(50f + this.combinedskill / 2f)f" comment="below what percentage hull is a component considered damaged (50..100)"/>
+          </do_else>
+          <set_value name="$basehullpersec" exact="50hp"/>
+          <set_value name="$skillleveltodronevalue" exact="2"/>
+          <set_value name="$hullpersec" exact="(this.combinedskill / 20f)hp * $skillleveltodronevalue * $basehullpersec"/>
+          <set_value name="$baseunwrecktime" exact="(120s / (this.combinedskill / 20f + 1))s" />
+          <find_dock_location name="$dockingbays" multiple="true" container="this.defensible" />
+          <!--debug_text filter="error" text="'%1 on %2 engineer.ai inited version %3'.[this.name, this.defensible.knownname, $version]"/-->
+
+          <!--[idle]-->
+          <label name="idle"/>
+          <do_if value="$version" exact="12" negate="true">
+            <!--]=> init-->
+            <resume label="init"/>
+          </do_if>
+          <do_if value="@$networkid">
+            <!--debug_text filter="error" text="'%1,%2: is ending mass traffic'.[this.name, this.defensible.name]" /-->
+            <end_mass_traffic network="$networkid" />
+            <remove_value name="$networkid"/>
+          </do_if>
+          <do_if value="this.defensible.isplayerowned and (this.skill.engineering lt 5) and (this.experienceprogress ge (100 * (this.skill.engineering + 1)))">
+            <set_experience_progress entity="this" exact="this.experienceprogress % (100 * (this.skill.engineering + 1))"/>
+            <set_skill entity="this" type="engineering" exact="this.skill.engineering + 1" />
+            <!--]=> init-->
+            <resume label="init"/>
+          </do_if>
+          <set_command command="command.scan"/>
+          <wait exact="30s" sinceversion="12">
+            <interrupt>
+              <conditions>
+                <event_object_attacked object="this.defensible"/>
+              </conditions>
+              <actions>
+                <!--]=> start_damage_control-->
+                <resume label="start_damage_control"/>
+              </actions>
+            </interrupt>
+          </wait>
+          <!--]=> start_repair-->
+          <resume label="start_repair"/>
+      
+
+      
+          <!--[start_damage_control]-->
+          <label name="start_damage_control"/>
+          <set_command command="command.protect" param="this.defensible" />
+          <do_if value="@$networkid">
+            <!--debug_text filter="error" text="'%1,%2: is ending mass traffic'.[this.name, this.defensible.name]" /-->
+            <end_mass_traffic network="$networkid" />
+            <remove_value name="$networkid"/>
+          </do_if>
+          <set_value name="$resumeidling" exact="player.age + 60s"/>
+          <!--[do_damage_control]-->
+          <label name="do_damage_control"/>
+          <!--[do_damage_control_waitloop]-->
+          <label name="do_damage_control_waitloop"/>
+          <!--TODO: something nice to help defending based on skills-->
+          <wait exact="$resumeidling - player.age + 1s" sinceversion="12">
+            <interrupt>
+              <conditions>
+                <event_object_attacked object="this.defensible"/>
+              </conditions>
+              <actions>
+                <set_value name="$resumeidling" exact="player.age + 60s"/>
+              </actions>
+            </interrupt>
+          </wait>
+          <do_if value="player.age" min="$resumeidling">
+            <remove_value name="$resumeidling"/>
+            <!--]=> idle-->
+            <resume label="idle"/>
+          </do_if>
+          <!--]=> do_damage_control-->
+          <resume label="do_damage_control"/>
+      
+      
+
+          <!--[start_repair]-->
+          <label name="start_repair"/>
+          <set_command command="command.repair" />
+          <!--[do_repair]-->
+          <label name="do_repair"/>
+          <do_if value="$version" exact="12" negate="true">
+            <!--]=> init-->
+            <resume label="init"/>
+          </do_if>
+          <do_if value="@$networkid">
+            <!--debug_text filter="error" text="'%1,%2: is ending mass traffic'.[this.name, this.defensible.name]" /-->
+            <end_mass_traffic network="$networkid" />
+            <remove_value name="$networkid"/>
+          </do_if>
+          <set_value name="$usedrones" exact="false"/>
+          <set_value name="$forcedrones" exact="false"/>
+          <set_value name="$repairdrones" exact="0"/>
+          <do_all exact="unitcategory.welder.maxmk" counter="$i">
+            <set_value name="$repairdrones" operation="add" exact="this.defensible.units.{unitcategory.welder}.mk.{$i}.count * $i" />
+            <do_if value="$dockingbays.indexof.{player.primaryship.dockslot}">
+              <set_value name="$repairdrones" operation="add" exact="player.primaryship.units.{unitcategory.welder}.mk.{$i}.count * $i" />
+            </do_if>
+          </do_all>
+          <!-- (if damaged dronepad and welder drones start with it) -->
+          <do_if value="$repairdrones">
+            <find_object_component multiple="true" name="$lookup" object="this.defensible" checkoperational="false" class="class.dronelaunchpad">
+              <match_parent checkoperational="true" />
+            </find_object_component>
+            <do_all exact="$lookup.count" counter="$i">
+              <set_value name="$item" exact="$lookup.{$i}"/>
+              <do_if value="($item.iswreck) or ($item.hullpercentage lt $hulldamagelimit)">
+                <set_value name="$torepair" exact="$item"/>
+                <!--]=> do_repair_thing-->
+                <resume label="do_repair_thing"/>
+              </do_if>
+            </do_all>
+            <do_if value="$lookup.count" min="1">
+              <set_value name="$usedrones" exact="true"/>
+            </do_if>
+          </do_if>
+          <!-- (now go with engines) -->
+          <find_object_component multiple="true" name="$lookup" object="this.defensible" checkoperational="false" surfaceelement="true" class="class.engine">
+            <match_any>
+              <match restorable="true" comment="wrecked"/>
+              <match repairable="true" invulnerable="false">
+                <match_hull max="$hulldamagelimit - 1"/>
+              </match>
+            </match_any>
+          </find_object_component>
+          <do_all exact="$lookup.count" counter="$i">
+            <set_value name="$item" exact="$lookup.{$i}"/>
+            <do_if value="($item.iswreck) or ($item.hullpercentage lt $hulldamagelimit)">
+              <set_value name="$torepair" exact="$item"/>
+              <!--]=> do_repair_thing-->
+              <resume label="do_repair_thing"/>
+            </do_if>
+          </do_all>
+          <!-- (now the jumpdrive) -->
+          <find_object_component multiple="true" name="$lookup" object="this.defensible" checkoperational="false" surfaceelement="true" class="class.jumpdrive">
+            <match_parent checkoperational="true" />
+            <match_any>
+              <match restorable="true" comment="wrecked"/>
+              <match repairable="true" invulnerable="false">
+                <match_hull max="$hulldamagelimit - 1"/>
+              </match>
+            </match_any>
+          </find_object_component>
+          <do_all exact="$lookup.count" counter="$i">
+            <set_value name="$item" exact="$lookup.{$i}"/>
+            <do_if value="($item.iswreck) or ($item.hullpercentage lt $hulldamagelimit)">
+              <set_value name="$torepair" exact="$item"/>
+              <!--]=> do_repair_thing-->
+              <resume label="do_repair_thing"/>
+            </do_if>
+          </do_all>
+          <!-- (components) -->
+          <find_object_component multiple="true" name="$lookup" object="this.defensible" checkoperational="false" surfaceelement="true" class="class.destructible">
+            <match_parent checkoperational="true" />
+            <match_any>
+              <match restorable="true" comment="wrecked"/>
+              <match repairable="true" invulnerable="false">
+                <match_hull max="$hulldamagelimit - 1"/>
+              </match>
+            </match_any>
+          </find_object_component>
+          <do_all exact="$lookup.count" counter="$i">
+            <set_value name="$item" exact="$lookup.{$i}"/>
+            <do_if value="($item.iswreck) or ($item.hullpercentage lt $hulldamagelimit)">
+              <set_value name="$torepair" exact="$item"/>
+              <!--]=> do_repair_thing-->
+              <resume label="do_repair_thing"/>
+            </do_if>
+          </do_all>
+          <!-- (summary) -->
+          <do_if value="this.defensible.summary.numadsigns.wreck
+              + this.defensible.summary.numefficiencyupgrades.wreck
+              + this.defensible.summary.numflakcontrollers.wreck
+              + this.defensible.summary.numshields.wreck
+              + this.defensible.summary.numsurfacedestructible.wreck
+              + this.defensible.summary.numturrets.wreck" min="1">
+            <!--]=> start_summary_repair-->
+            <resume label="start_summary_repair"/>
+          </do_if>
+          <!--[no_summary_repairable]-->
+          <label name="no_summary_repairable"/>
+          <do_if value="this.defensible.hullpercentage lt $hulldamagelimit">
+            <set_value name="$torepair" exact="this.defensible"/>
+            <set_value name="$forcedrones" exact="true" comment="to bypass the issurfaceelement check before applying drones modifiers and sending out drones"/>
+            <!--]=> do_repair_thing-->
+            <resume label="do_repair_thing"/>
+          </do_if>
+          <remove_value name="$usedrones"/>
+          <remove_value name="$repairdrones"/>
+          <remove_value name="$lookup"/>
+          <remove_value name="$item"/>
+          <!--]=> idle-->
+          <resume label="idle"/>
+      
+      
+      
+          <!--[do_repair_thing]-->
+          <label name="do_repair_thing"/>
+          <do_if value="$torepair.iswreck">
+            <!--]=> do_restore_thing-->
+            <resume label="do_restore_thing"/>
+          </do_if>
+          <do_if value="$usedrones and ($torepair.issurfaceelement or $forcedrones)">
+            <!--debug_text filter="error" text="'%1,%2: Launching drones to repair %3'.[this.name, this.defensible.name, $torepair.name]"/-->
+            <launch_repair_drones object="this.defensible" target="this.defensible" components="[$torepair]" result="$networkid" />
+          </do_if>
+          <set_value name="$finalhullpersec" exact="$hullpersec"/>
+          <do_if value="$usedrones and ($torepair.issurfaceelement or $forcedrones)">
+            <set_value name="$finalhullpersec" operation="add" exact="$repairdrones * (this.combinedskill / 20f + this.skill.management) / 10f * $basehullpersec" />
+          </do_if>
+          <set_value name="$timetorepair" exact="(($torepair.maxhull / 100f * ($hulldamagelimit - $torepair.hullpercentage) / $finalhullpersec)f)s"/>
+          <!--debug_text filter="error" text="'%1,%2: %3 has %4%% of %5 hull points, repairing it will take %6s given my rate of %7, base: %8 skills%%: %9'.[this.name, this.defensible.name, $torepair.name, $torepair.hullpercentage, $torepair.maxhull, $timetorepair, $finalhullpersec, $hullpersec, this.combinedskill]"/-->
+          <!--debug_text filter="error" text="'...:management: %1, issurface: %2 usedrones: %3, repairdrones: %4'.[this.skill.management, $torepair.issurfaceelement, $usedrones, $repairdrones]"/-->
+          <do_if value="this.defensible.isplayerowned and $timetorepair ge 60s">
+            <show_notification caption="'Reparations will take some time'" details="[this.name, this.defensible.name, $torepair.name, $timetorepair / 60, 'minutes left']" queued="true" />
+          </do_if>
+          <set_value name="$tohullvalue" exact="$hulldamagelimit"/>
+          <do_if value="$timetorepair" min="301s">
+            <set_value name="$tohullvalue" exact="(($tohullvalue - $torepair.hullpercentage) / ($timetorepair)f * 300f)hp + $torepair.hullpercentage"/>
+            <set_value name="$timetorepair" exact="300s" />
+          </do_if>
+          <wait exact="$timetorepair" sinceversion="12">
+            <interrupt>
+              <conditions>
+                <event_object_attacked object="this.defensible"/>
+              </conditions>
+              <actions>
+                <remove_value name="$torepair"/>
+                <remove_value name="$usedrones"/>
+                <remove_value name="$timetorepair"/>
+                <remove_value name="$finallhullpersec"/>
+                <!--]=> start_damage_control-->
+                <resume label="start_damage_control"/>
+              </actions>
+            </interrupt>  
+          </wait>
+          <do_if value="$torepair.exists and ($torepair.hullpercentage lt $tohullvalue)">
+            <set_object_hull object="$torepair" exact="$tohullvalue"/>
+            <!--debug_text filter="error" text="'%1,%2: %3 repaired up to %4%% hull, took %5s'.[this.name, this.defensible.name, $torepair.name, $tohullvalue, $timetorepair]"/-->
+            <do_if value="this.skill.engineering" max="4">
+              <set_experience_progress entity="this" exact="this.experienceprogress + 1"/>
+            </do_if>
+          </do_if>
+          <remove_value name="$torepair"/>
+          <remove_value name="$timetorepair"/>
+          <remove_value name="$finallhullpersec"/>
+          <!--]=> do_repair-->
+          <resume label="do_repair"/>
+
+          <!--[do_restore_thing]-->
+          <label name="do_restore_thing"/>
+          <set_value name="$timetorepair" exact="($torepair.size * sqrt($torepair.size) / 4)s"/>
+          <do_if value="$timetorepair" min="1200s">
+            <set_value name="$timetorepair" exact="1200s"/>
+          </do_if>
+          <set_value name="$skillmodifier" exact="this.combinedskill / 20f + 1"/>
+          <do_if value="$usedrones and ($torepair.issurfaceelement or $forcedrones)">
+            <set_value name="$skillmodifier" operation="add" exact="$repairdrones / $skillleveltodronevalue * (this.combinedskill / 20f + this.skill.management) / 10f"/>
+          </do_if>
+          <set_value name="$timetorepair" exact="($timetorepair / $skillmodifier)s + $baseunwrecktime"/>
+          <!--debug_text filter="error" text="'%1,%2: %3 is wrecked, its size is %4, I will need %5s given my skills %% %6, drones value %7 and management skill %8, issurface: %9'.[this.name, this.defensible.name, $torepair.name, $torepair.size, $timetorepair, this.combinedskill, $repairdrones, this.skill.management, $torepair.issurfaceelement]"/-->
+          <do_if value="this.defensible.isplayerowned and $timetorepair ge 60s">
+            <show_notification caption="'Restoration will take some time'" details="[this.name, this.defensible.name, $torepair.name, $timetorepair / 60, 'minutes left']" queued="true" />
+          </do_if>
+          <wait exact="$timetorepair" sinceversion="12">
+            <interrupt>
+              <conditions>
+                <event_object_attacked object="this.defensible"/>
+              </conditions>
+              <actions>
+                <remove_value name="$torepair"/>
+                <remove_value name="$usedrones"/>
+                <remove_value name="$timetorepair"/>
+                <!--]=> start_damage_control-->
+                <resume label="start_damage_control"/>
+              </actions>
+            </interrupt>
+          </wait>
+          <do_if value="$torepair.exists">
+            <do_if value="$torepair.iswreck">
+              <restore_object object="$torepair" hull="1"/>
+              <!--debug_text filter="error" text="'%1,%2: %3 restored from wreckstate'.[this.name, this.defensible.name, $torepair.name]"/-->
+              <do_if value="this.skill.engineering" max="4">
+                <set_experience_progress entity="this" exact="this.experienceprogress + 5"/>
+              </do_if>
+            </do_if>
+          </do_if>
+          <remove_value name="$timetorepair"/>
+          <!--]=> do_repair_thing-->
+          <resume label="do_repair_thing"/>
+      
+          <!--[start_summary_repair]-->
+          <label name="start_summary_repair"/>
+          <wait exact="(100 - this.combinedskill)s + 10s" sinceversion="12">
+            <interrupt>
+              <conditions>
+                <event_object_attacked object="this.defensible"/>
+              </conditions>
+              <actions>
+                <remove_value name="$torepair"/>
+                <remove_value name="$usedrones"/>
+                <remove_value name="$timetorepair"/>
+                <!--]=> start_damage_control-->
+                <resume label="start_damage_control"/>
+              </actions>
+            </interrupt>
+          </wait>
+          <do_if value="this.defensible.summary.numshields.wreck" min="1">
+            <set_summarised_shield_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
+          </do_if>
+          <do_elseif value="this.defensible.summary.numturrets.wreck" min="1">
+            <set_summarised_turret_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
+          </do_elseif>
+          <do_elseif value="this.defensible.summary.numsurfacedestructible.wreck" min="1">
+            <set_summarised_surfacedestructible_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
+          </do_elseif>
+          <do_elseif value="this.defensible.summary.numflakcontrollers.wreck" min="1">
+            <set_summarised_flakcontroller_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
+          </do_elseif>
+          <do_elseif value="this.defensible.summary.numefficiencyupgrades.wreck" min="1">
+            <set_summarised_efficiencyupgrade_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
+          </do_elseif>
+          <do_elseif value="this.defensible.summary.numadsigns.wreck" min="1">
+            <set_value name="$xp" operation="add" exact="1" />
+            <set_summarised_adsign_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
+          </do_elseif>
+          <do_else>
+            <!-- ]=> no_summary_repairable-->
+            <resume label="no_summary_repairable"/>
+          </do_else>
+          <do_if value="this.skill.engineering" max="4">
+            <set_experience_progress entity="this" exact="this.experienceprogress + 1"/>
+          </do_if>
+          <!--]=> do_repair-->
+          <resume label="do_repair"/>
+
+      
+      
+          <debug_text text="'Damn it is the end of my AI script, %1 (%2)'.[this.name,this.defensible.name]" chance="100" filter="error"/>
+        </actions>
+      </attention>
+    </aiscript>
+  </replace>
+</diff>

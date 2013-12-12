@@ -242,7 +242,7 @@
           </do_if>
           <set_value name="$finalhullpersec" exact="$hullpersec"/>
           <do_if value="$usedrones and ($torepair.issurfaceelement or $forcedrones)">
-            <set_value name="$finalhullpersec" operation="add" exact="$repairdrones * (this.combinedskill / 20f + this.skill.management) / 10f * $basehullpersec" />
+            <set_value name="$finalhullpersec" operation="add" exact="$repairdrones * (((this.skill.leadership + this.skill.management) / 10f) + 1) * $basehullpersec" />
           </do_if>
           <set_value name="$timetorepair" exact="(($torepair.maxhull / 100f * ($hulldamagelimit - $torepair.hullpercentage) / $finalhullpersec)f)s"/>
           <!--debug_text filter="error" text="'%1,%2: %3 has %4%% of %5 hull points, repairing it will take %6s given my rate of %7, base: %8 skills%%: %9'.[this.name, this.defensible.name, $torepair.name, $torepair.hullpercentage, $torepair.maxhull, $timetorepair, $finalhullpersec, $hullpersec, this.combinedskill]"/-->
@@ -291,7 +291,7 @@
           </do_if>
           <set_value name="$skillmodifier" exact="this.combinedskill / 20f + 1"/>
           <do_if value="$usedrones and ($torepair.issurfaceelement or $forcedrones)">
-            <set_value name="$skillmodifier" operation="add" exact="$repairdrones / $skillleveltodronevalue * (this.combinedskill / 20f + this.skill.management) / 10f"/>
+            <set_value name="$skillmodifier" operation="add" exact="$repairdrones / $skillleveltodronevalue * (((this.skill.leadership + this.skill.management) / 10f) + 1)"/>
           </do_if>
           <set_value name="$timetorepair" exact="($timetorepair / $skillmodifier)s + $baseunwrecktime"/>
           <!--debug_text filter="error" text="'%1,%2: %3 is wrecked, its size is %4, I will need %5s given my skills %% %6, drones value %7 and management skill %8, issurface: %9'.[this.name, this.defensible.name, $torepair.name, $torepair.size, $timetorepair, this.combinedskill, $repairdrones, this.skill.management, $torepair.issurfaceelement]"/-->

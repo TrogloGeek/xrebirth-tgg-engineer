@@ -6,7 +6,7 @@
         <param name="debugoutputchance" default="0"/>
       </params>
       <init>
-        <set_command command="command.repair" />
+        <set_command command="command.support" param="this.defensible" />
       </init>
       <attention min="unknown">
         <actions>
@@ -223,8 +223,8 @@
               <resume label="do_repair_thing"/>
             </do_if>
           </do_all>
-          <do_if value="this.defensible.attentionlevel?">
-            <do_if value="(this.defensible.attentionlevel == attention.nearby) or (this.defensible.attentionlevel == attention.inzone) or (this.defensible.attentionlevel == attention.visible)" negate="true">
+          <do_if value="this.defensible.attention?">
+            <do_if value="(this.defensible.attention == attention.nearby) or (this.defensible.attention == attention.inzone) or (this.defensible.attention == attention.visible)" negate="true">
               <!-- (summary) -->
               <do_if value="this.defensible.summary.numadsigns.wreck
                   + this.defensible.summary.numefficiencyupgrades.wreck
@@ -237,6 +237,9 @@
               </do_if>
             </do_if>
           </do_if>
+          <do_else>
+            <debug_text filter="error" text="'%1 on %2 (%3) has an undefined attention level'.[this.name, this.defensible.name, this.defensible.knownname]"/>
+          </do_else>
           <!--[no_summary_repairable]-->
           <label name="no_summary_repairable"/>
           <do_if value="this.defensible.hullpercentage lt $hulldamagelimit">
@@ -307,6 +310,8 @@
           <!--]=> do_repair-->
           <resume label="do_repair"/>
 
+          
+          
           <!--[do_restore_thing]-->
           <label name="do_restore_thing"/>
           <!--do_if value="$usedrones and ($torepair.issurfaceelement or $forcedrones)"-->
@@ -353,22 +358,10 @@
           <!--]=> do_repair_thing-->
           <resume label="do_repair_thing"/>
       
+          
+          
           <!--[start_summary_repair]-->
           <label name="start_summary_repair"/>
-          <wait exact="(100 - this.combinedskill)s + 10s" sinceversion="12">
-            <interrupt>
-              <conditions>
-                <event_object_attacked object="this.defensible"/>
-              </conditions>
-              <actions>
-                <remove_value name="$torepair"/>
-                <remove_value name="$usedrones"/>
-                <remove_value name="$timetorepair"/>
-                <!--]=> start_damage_control-->
-                <resume label="start_damage_control"/>
-              </actions>
-            </interrupt>
-          </wait>
           <set_value name="$total_summary_wrecks" value="this.defensible.summary.numadsigns.wreck
               + this.defensible.summary.numefficiencyupgrades.wreck
               + this.defensible.summary.numflakcontrollers.wreck
@@ -378,41 +371,42 @@
           <do_if value="this.defensible.summary.numshields.wreck" min="1">
             <set_summarised_shield_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
           </do_if>
-          <do_elseif value="this.defensible.summary.numturrets.wreck" min="1">
+          <do_if value="this.defensible.summary.numturrets.wreck" min="1">
             <set_summarised_turret_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
-          </do_elseif>
-          <do_elseif value="this.defensible.summary.numsurfacedestructible.wreck" min="1">
+          </do_if>
+          <do_if value="this.defensible.summary.numsurfacedestructible.wreck" min="1">
             <set_summarised_surfacedestructible_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
-          </do_elseif>
-          <do_elseif value="this.defensible.summary.numflakcontrollers.wreck" min="1">
+          </do_if>
+          <do_if value="this.defensible.summary.numflakcontrollers.wreck" min="1">
             <set_summarised_flakcontroller_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
-          </do_elseif>
-          <do_elseif value="this.defensible.summary.numefficiencyupgrades.wreck" min="1">
+          </do_if>
+          <do_if value="this.defensible.summary.numefficiencyupgrades.wreck" min="1">
             <set_summarised_efficiencyupgrade_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
-          </do_elseif>
-          <do_elseif value="this.defensible.summary.numadsigns.wreck" min="1">
+          </do_if>
+          <do_if value="this.defensible.summary.numadsigns.wreck" min="1">
             <set_summarised_adsign_state object="this.defensible" state="operational" parentstate="operational" previous="wreck" exact="1"/>
-          </do_elseif>
-          <do_else>
-            <remove_value name="$total_summary_wrecks"/>
-            <!-- ]=> no_summary_repairable-->
-            <resume label="no_summary_repairable"/>
-          </do_else>
+          </do_if>
           <!-- (did we actually did anything?) -->
-          <do_if exact="$total_summary_wrecks" value="this.defensible.summary.numadsigns.wreck
+          <set_value name="$summary_fixed_count" value="$total_summary_wrecks - (
+                this.defensible.summary.numadsigns.wreck
               + this.defensible.summary.numefficiencyupgrades.wreck
               + this.defensible.summary.numflakcontrollers.wreck
               + this.defensible.summary.numshields.wreck
               + this.defensible.summary.numsurfacedestructible.wreck
-              + this.defensible.summary.numturrets.wreck">
+              + this.defensible.summary.numturrets.wreck
+          )"/>
+          <do_if value="$summary_fixed_count" exact="0">
             <debug_text filter="error" text="'%1 on %2 tried to repair one of %3 summary wrecks without success, skip it on this pass'.[this.name, this.defensible.knownname, $total_summary_wrecks]" />
             <remove_value name="$total_summary_wrecks"/>
             <!-- ]=> no_summary_repairable-->
             <resume label="no_summary_repairable"/>
           </do_if>
+          <remove_value name="$total_summary_wrecks"/>
           <do_if value="this.defensible.isplayerowned and (this.skill.engineering lt 5)">
-            <set_experience_progress entity="this" exact="this.experienceprogress + 1"/>
+            <set_experience_progress entity="this" exact="this.experienceprogress + $summary_fixed_count"/>
           </do_if>
+          <wait exact="((110 - this.combinedskill) * $summary_fixed_count)s" sinceversion="12"/>
+          <remove_value name="$summary_fixed_count"/>
           <!--]=> do_repair-->
           <resume label="do_repair"/>
 
